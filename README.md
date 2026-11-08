@@ -1,2 +1,2 @@
 # primalwinter26.2-Transplantation
-这个是原始寒冬primalwintermod在26.2fabric的移植版本,只支持这一个版本
+这个是原始寒冬primalwintermod在26.2fabric的移植版本,只支持这一个版本，以及还有把原mod永久下雪改成按天数循环下雪的单独版本
