@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/bamboo_small_leaves",
+  "textures": {
+    "particle": "primalwinter:block/snowy_bamboo_small_leaves",
+    "texture": "primalwinter:block/snowy_bamboo_small_leaves"
+  }
+}

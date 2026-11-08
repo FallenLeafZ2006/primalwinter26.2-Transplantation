@@ -1,0 +1,101 @@
+package com.alcatrazescapee.primalwinter.util;
+
+import com.alcatrazescapee.primalwinter.blocks.PrimalWinterBlocks;
+import com.alcatrazescapee.primalwinter.platform.XPlatform;
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.logging.LogUtils;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.gamerules.GameRules;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.saveddata.WeatherData;
+import org.slf4j.Logger;
+
+public final class EventHandler
+{
+    private static final Logger LOGGER = LogUtils.getLogger();
+
+    public static void registerCommands(CommandDispatcher<CommandSourceStack> dispatcher)
+    {
+        final boolean enable = XPlatform.INSTANCE.config().enableWeatherCommand.getAsBoolean();
+        LOGGER.info("Vanilla /weather enabled = {}", enable);
+        if (!enable)
+        {
+            // Vanilla weather command... NOT ALLOWED
+            dispatcher.getRoot().getChildren().removeIf(node -> node.getName().equals("weather"));
+            dispatcher.register(Commands.literal("weather").executes(source -> {
+                source.getSource().sendSuccess(() -> Component.literal("Not even a command can overcome this storm... (This command is disabled by Primal Winter)"), false);
+                return 0;
+            }));
+        }
+    }
+
+    /**
+     * During {@link ServerLevel#tickChunk(net.minecraft.world.level.chunk.LevelChunk, int)}, places additional snow layers
+     */
+    public static void placeExtraSnow(ServerLevel level, ChunkAccess chunk)
+    {
+        if (XPlatform.INSTANCE.config().isWinterDimension(level.dimension()) &&
+            XPlatform.INSTANCE.config().enableSnowAccumulationDuringWeather.getAsBoolean() &&
+            level.getRandom().nextInt(16) == 0)
+        {
+            final int blockX = chunk.getPos().getMinBlockX();
+            final int blockZ = chunk.getPos().getMinBlockZ();
+            final BlockPos pos = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING, level.getBlockRandomPos(blockX, 0, blockZ, 15));
+            final BlockState state = level.getBlockState(pos);
+            if (level.getBrightness(LightLayer.BLOCK, pos) < 10)
+            {
+                if (state.getBlock() == Blocks.SNOW)
+                {
+                    // Stack snow layers
+                    final int layers = state.getValue(BlockStateProperties.LAYERS);
+                    if (layers < 5)
+                    {
+                        level.setBlockAndUpdate(pos, state.setValue(BlockStateProperties.LAYERS, 1 + layers));
+                    }
+
+                    final BlockPos belowPos = pos.below();
+                    final BlockState belowState = level.getBlockState(belowPos);
+                    final Block replacementBlock = PrimalWinterBlocks.SNOWY_TERRAIN_BLOCKS.getOrDefault(belowState.getBlock(), () -> null).get();
+                    if (replacementBlock != null)
+                    {
+                        level.setBlockAndUpdate(belowPos, replacementBlock.defaultBlockState());
+                    }
+                }
+            }
+        }
+    }
+
+    public static void setLevelToThunder(LevelAccessor maybeLevel)
+    {
+        if (maybeLevel instanceof ServerLevel level && XPlatform.INSTANCE.config().isWinterDimension(level.dimension()))
+        {
+            NewWorldSavedData.onlyForNewWorlds(level, () -> {
+                LOGGER.info("Modifying weather for world {}", level.dimension().identifier());
+                final WeatherData weather = level.getWeatherData();
+                weather.setClearWeatherTime(0);
+                weather.setRaining(true);
+                weather.setRainTime(Integer.MAX_VALUE);
+                weather.setThundering(true);
+                weather.setThunderTime(Integer.MAX_VALUE);
+                level.getGameRules().set(GameRules.ADVANCE_WEATHER, false, level.getServer());
+            });
+        }
+    }
+
+    public static void onPlayerJoinWorld(ServerPlayer player)
+    {
+        XPlatform.INSTANCE.config().syncTo(player);
+    }
+}

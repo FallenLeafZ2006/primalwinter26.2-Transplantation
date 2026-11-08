@@ -1,0 +1,11 @@
+{
+  "values": [
+    "#minecraft:undead",
+    "#minecraft:raiders",
+    "minecraft:wolf",
+    "minecraft:wandering_trader",
+    "minecraft:trader_llama",
+    "minecraft:spider",
+    "minecraft:creeper"
+  ]
+}
